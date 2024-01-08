@@ -3,11 +3,11 @@
 #include <sys/wait.h>
 
 using matrix=std::vector<std::vector<int>>;
-
+const int MAX_COUNT_SHIPS=10;
 
 void arrangement_ships(matrix &map_player, const matrix input_ships)
 {
-    for (size_t i = 0; i < 10; ++i)
+    for (size_t i = 0; i <input_ships.size()-1; ++i)
     {
         int size_ship = input_ships[i][0];
         switch (size_ship)
@@ -99,7 +99,7 @@ void clear(int (&pipe_first)[2])
         else
         {
             wait(NULL);
-            char result_child_first[80];
+            char result_child_first[200];
             int bytes_read_first = read(pipe_first[0], result_child_first, sizeof(result_child_first));
             if (bytes_read_first > 0)
             {
@@ -113,14 +113,48 @@ void clear(int (&pipe_first)[2])
    
 }
 
-void startGame(int (&pipe_first)[2], matrix &map_player,matrix& input_ships)
+std::string startMenu(int (&pipe_first)[2]){
+    std::cout<<"1 - посмотреть статистику"<<std::endl;
+    pid_t process_id = fork();
+
+        if (process_id == 0)
+        {
+            close(pipe_first[0]);
+            dup2(pipe_first[1], STDOUT_FILENO);
+            close(pipe_first[1]);
+            execl("./client", "./client", "5", NULL);
+            perror("exec");
+            exit(1);
+        }
+        else
+        {
+            wait(NULL);
+            char result_child_first[200];
+
+            int bytes_read_first = read(pipe_first[0], result_child_first, sizeof(result_child_first));
+            if (bytes_read_first > 0)
+            {
+                std::string request(result_child_first, bytes_read_first);
+                return request;
+            }
+        }
+    return "";
+}
+
+void startGame(int (&pipe_first)[2], matrix &map_player,matrix& input_ships,auto iterator_players)
 {
+    
+    std::string request=startMenu(pipe_first);
+    if (request=="1")
+    {
+        std::cout<<iterator_players->first + ": Выиграл "<<iterator_players->second.first<<".";
+        std::cout<<"Проиграл "<<iterator_players->second.second<<"\n";
+    }
     std::cout << "Введите размер корабля и две точки "
               << "\n";
-    {
-        pid_t process_id_first = fork();
+        pid_t process_id = fork();
 
-        if (process_id_first == 0)
+        if (process_id == 0)
         {
             close(pipe_first[0]);
             dup2(pipe_first[1], STDOUT_FILENO);
@@ -158,13 +192,10 @@ void startGame(int (&pipe_first)[2], matrix &map_player,matrix& input_ships)
                 print_matrix(map_player);
             }
         }
-    }
-        
-
 }
 
 bool killShip(matrix &map_player,matrix& input_ships){
-    for (size_t i = 0; i < input_ships.size(); ++i)
+    for (size_t i = 0; i < input_ships.size()-1; ++i)
     {
         bool isKill=true;
         int size_ship = input_ships[i][0];
@@ -307,6 +338,8 @@ void movePlayer(int (&pipe_first)[2],matrix &map_current,matrix &map_player, mat
     }
 }
 
+
+
 int main()
 {
     int pipe_first[2];
@@ -355,8 +388,8 @@ int main()
             {
                 wait(NULL);
                 wait(NULL);
-                char result_child_first[80];
-                char result_child_second[80];
+                char result_child_first[200];
+                char result_child_second[200];
 
                 int bytes_read_first = read(pipe_first[0], result_child_first, sizeof(result_child_first));
                 int bytes_read_second = read(pipe_second[0], result_child_second, sizeof(result_child_second));
@@ -380,35 +413,38 @@ int main()
     auto it1 = players.begin();
     auto it2 = players.begin();
     ++it2;
-    startGame(pipe_first, map_player1,input_ships_first);
-    clear(pipe_first);
-    startGame(pipe_first, map_player2,input_ships_second);
-    clear(pipe_first);
-
     while (true)
-    {
-        movePlayer(pipe_first,map_player1,map_player2, map_enemy1, it1->first,input_ships_first,count_kill_ships_first);
-        if (count_kill_ships_first==10)
-        {
-            std::cout<<it1->first+" победил"<<std::endl;
-            std::cout<<it2->first+" проиграл"<<std::endl;
-            it1->second.first++;
-            it2->second.second++;
-            break;
-        }
-        // clear(pipe_first);
-        // movePlayer(pipe_first,map_player2, map_player1, map_enemy2, it2->first,input_ships_second,count_kill_ships_second);
-        if (count_kill_ships_second==2)
-        {
-            std::cout<<it2->first+" победил"<<std::endl;
-            std::cout<<it1->first+" проиграл"<<std::endl;
-            it2->second.first++;
-            it1->second.second++;
-            break;
-        }
-        // clear(pipe_first);
+    {       
+        startGame(pipe_first, map_player1,input_ships_first,it1);
+        clear(pipe_first);
+        startGame(pipe_second, map_player2,input_ships_second,it2);
+        clear(pipe_second);
 
+        while (true)
+        {
+            movePlayer(pipe_first,map_player1,map_player2, map_enemy1, it1->first,input_ships_first,count_kill_ships_first);
+            if (count_kill_ships_first==MAX_COUNT_SHIPS)
+            {
+                std::cout<<it1->first+" победил"<<std::endl;
+                std::cout<<it2->first+" проиграл"<<std::endl;
+                it1->second.first++;
+                it2->second.second++;
+                break;
+            }
+            // clear(pipe_first);
+            movePlayer(pipe_second,map_player2, map_player1, map_enemy2, it2->first,input_ships_second,count_kill_ships_second);
+            if (count_kill_ships_second==MAX_COUNT_SHIPS)
+            {
+                std::cout<<it2->first+" победил"<<std::endl;
+                std::cout<<it1->first+" проиграл"<<std::endl;
+                it2->second.first++;
+                it1->second.second++;
+                break;
+            }
+            // clear(pipe_second);
+
+        }
+        std::cout<<"\n";
     }
-
     return 0;
 }

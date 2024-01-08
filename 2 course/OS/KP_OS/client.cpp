@@ -4,6 +4,7 @@
 
 int main(int argc, char *argv[])
 {
+    const int max_count_ships=10;
     int state = std::stoi(argv[1]);
     if (state == 1)
     {
@@ -15,7 +16,7 @@ int main(int argc, char *argv[])
     else if (state==2)
     {
         std::string request,temp;
-        for (size_t i = 0; i < 10; ++i)
+        for (size_t i = 0; i < max_count_ships; ++i)
         {
             std::getline(std::cin, temp); 
             request+=(temp+"\n");
@@ -38,9 +39,12 @@ int main(int argc, char *argv[])
         std::string coords=std::to_string(x)+" "+std::to_string(y);
         write(STDOUT_FILENO, coords.c_str(), coords.length());
     }
-    
-    
-    
+    else if (state==5)
+    {
+        std::string request;
+        std::cin>>request;
+        write(STDOUT_FILENO, request.c_str(), request.length());
+    }
     return 0;
 
 }
